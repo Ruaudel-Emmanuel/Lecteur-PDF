@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Lecteur PDF</title>
+  <style>
+    :root {
+      --bg: #f5f5f5; --bar: #ffffff; --txt: #222; --btn: #e8e8e8;
+    }
+    html.dark {
+      --bg: #1e1e1e; --bar: #2b2b2b; --txt: #e0e0e0; --btn: #3a3a3a;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { height: 100%; background: var(--bg); color: var(--txt); font-family: system-ui, sans-serif; }
+    #bar {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 10;
+      background: var(--bar); display: flex; align-items: center; gap: 6px;
+      padding: 8px 10px; box-shadow: 0 1px 4px rgba(0,0,0,.15); padding-top: calc(8px + env(safe-area-inset-top));
+    }
+    #bar button, #bar label {
+      background: var(--btn); color: var(--txt); border: none; border-radius: 8px;
+      padding: 8px 12px; font-size: 15px; cursor: pointer; user-select: none;
+    }
+    #pageinfo { font-size: 14px; margin-left: auto; min-width: 90px; text-align: right; opacity: .8; }
+    #viewer {
+      position: absolute; top: 0; bottom: 0; left: 0; right: 0;
+      overflow-y: auto; -webkit-overflow-scrolling: touch; padding-top: 60px;
+    }
+    #viewer canvas { display: block; margin: 8px auto; box-shadow: 0 2px 8px rgba(0,0,0,.25); background: #fff; }
+    #empty {
+      position: absolute; top: 60px; bottom: 0; left: 0; right: 0;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+    }
+    #empty p { opacity: .7; text-align: center; padding: 0 24px; }
+    #openbtn { font-size: 18px; padding: 14px 28px; border: none; border-radius: 12px; background: #2f6fed; color: #fff; cursor: pointer; }
+    input[type=file] { display: none; }
+  </style>
+</head>
+<body>
+  <div id="bar">
+    <button id="zoomout">−</button>
+    <button id="zoomin">＋</button>
+    <button id="theme">🌙</button>
+    <label for="file">📄 Ouvrir</label>
+    <span id="pageinfo"></span>
+  </div>
+  <div id="empty">
+    <button id="openbtn">Ouvrir un PDF</button>
+    <p>Aucune publicité · Aucune collecte de données · 100 % hors ligne</p>
+  </div>
+  <div id="viewer"></div>
+  <input type="file" id="file" accept="application/pdf,.pdf">
+
+  <script type="module">
+    import * as pdfjsLib from './pdfjs/pdf.min.mjs';
+    pdfjsLib.GlobalWorkerOptions.workerSrc = './pdfjs/pdf.worker.min.mjs';
+
+    const viewer = document.getElementById('viewer');
+    const empty = document.getElementById('empty');
+    const fileInput = document.getElementById('file');
+    const pageinfo = document.getElementById('pageinfo');
+    const zooms = [0.5, 0.7, 1, 1.4, 2, 2.8, 4];
+    let zoomIdx = 2, pdf = null, pageCanvases = [];
+
+    function fit() {
+      // zoom 1 = largeur écran
+      return Math.max(1, Math.floor((window.innerWidth - 24) / 612 * 10) / 10);
+    }
+    function baseScale() { return zooms[zoomIdx] * fit(); }
+
+    function render() {
+      if (!pdf) return;
+      viewer.innerHTML = ''; pageCanvases = [];
+      const scale = baseScale();
+      for (let n = 1; n <= pdf.numPages; n++) {
+        pdf.getPage(n).then(p => {
+          const vp = p.getViewport({ scale });
+          const c = document.createElement('canvas');
+          const ctx = c.getContext('2d');
+          c.width = Math.floor(vp.width);
+          c.height = Math.floor(vp.height);
+          c.dataset.page = n;
+          p.render({ canvasContext: ctx, viewport: vp });
+          viewer.appendChild(c);
+          pageCanvases.push(c);
+          if (n === pdf.numPages) pageinfo.textContent = '1 / ' + pdf.numPages;
+        });
+      }
+    }
+
+    async function open(file) {
+      const buf = await file.arrayBuffer();
+      pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+      empty.style.display = 'none';
+      zoomIdx = 2;
+      render();
+    }
+
+    viewer.addEventListener('scroll', () => {
+      if (!pdf) return;
+      const mid = viewer.scrollTop + viewer.clientHeight / 2;
+      for (const c of pageCanvases) {
+        if (mid >= c.offsetTop && mid < c.offsetTop + c.offsetHeight) {
+          pageinfo.textContent = c.dataset.page + ' / ' + pdf.numPages;
+          break;
+        }
+      }
+    }, { passive: true });
+
+    document.getElementById('zoomin').onclick = () => { if (pdf && zoomIdx < zooms.length - 1) { zoomIdx++; render(); } };
+    document.getElementById('zoomout').onclick = () => { if (pdf && zoomIdx > 0) { zoomIdx--; render(); } };
+    document.getElementById('theme').onclick = (e) => {
+      document.documentElement.classList.toggle('dark');
+      e.target.textContent = document.documentElement.classList.contains('dark') ? '☀️' : '🌙';
+      localStorage.setItem('theme', document.documentElement.classList.contains('dark') ? 'dark' : 'light');
+    };
+    if (localStorage.getItem('theme') === 'dark') {
+      document.documentElement.classList.add('dark');
+      document.getElementById('theme').textContent = '☀️';
+    }
+    fileInput.onchange = () => { if (fileInput.files[0]) open(fileInput.files[0]); };
+    document.getElementById('openbtn').onclick = () => fileInput.click();
+  </script>
+</body>
+</html>

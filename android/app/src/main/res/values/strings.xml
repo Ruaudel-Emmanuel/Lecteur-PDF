@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Lecteur PDF</string>
+    <string name="title_activity_main">Lecteur PDF</string>
+    <string name="package_name">fr.rennesdev.lecteurpdf</string>
+    <string name="custom_url_scheme">fr.rennesdev.lecteurpdf</string>
+</resources>

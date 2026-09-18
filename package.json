@@ -1,0 +1,16 @@
+{
+  "name": "lecteur-pdf",
+  "version": "1.0.0",
+  "description": "Lecteur PDF simple, gratuit, sans publicité, 100% hors ligne",
+  "private": true,
+  "scripts": {
+    "sync": "npx cap sync android",
+    "build": "cd android && ./gradlew bundleRelease assembleRelease"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/cli": "^8.5.2",
+    "@capacitor/core": "^8.5.2",
+    "pdfjs-dist": "^4.10.38"
+  }
+}

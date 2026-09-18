@@ -1,0 +1,6 @@
+{
+  "appId": "fr.rennesdev.lecteurpdf",
+  "appName": "Lecteur PDF",
+  "webDir": "www",
+  "android": { "allowMixedContent": false }
+}
