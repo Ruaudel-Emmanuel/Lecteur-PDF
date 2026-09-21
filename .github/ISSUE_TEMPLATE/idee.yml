@@ -1,0 +1,25 @@
+name: 💡 Proposition d'amélioration
+description: Une idée d'évolution du projet
+labels: ["amélioration"]
+body:
+  - type: textarea
+    id: besoin
+    attributes:
+      label: Problème ou besoin
+      description: Quel besoin concret cette amélioration couvre-t-elle ?
+    validations:
+      required: true
+  - type: textarea
+    id: proposition
+    attributes:
+      label: Proposition
+      description: À quoi devrait ressembler la solution ?
+    validations:
+      required: true
+  - type: checkboxes
+    id: verif
+    attributes:
+      label: Avant de proposer
+      options:
+        - label: J'ai vérifié qu'il n'existe pas déjà une issue similaire
+          required: true

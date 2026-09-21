@@ -1,0 +1,39 @@
+name: 🐛 Bug
+description: Signaler un comportement anormal
+labels: ["bug"]
+body:
+  - type: textarea
+    id: constat
+    attributes:
+      label: Constat
+      description: Que se passe-t-il ? Où et quand ?
+    validations:
+      required: true
+  - type: textarea
+    id: attendu
+    attributes:
+      label: Comportement attendu
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Étapes de reproduction
+      description: Numérotées, avec captures d'écran si possible
+    validations:
+      required: false
+  - type: dropdown
+    id: environnement
+    attributes:
+      label: Environnement
+      options:
+        - Android
+        - Web / navigateur
+        - Serveur (VPS)
+        - Autre
+    validations:
+      required: true
+  - type: textarea
+    id: contexte
+    attributes:
+      label: Contexte supplémentaire
