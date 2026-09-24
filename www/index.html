@@ -31,9 +31,18 @@
     #empty {
       position: absolute; top: 60px; bottom: 0; left: 0; right: 0;
       display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+      /* au-dessus de #viewer (déclaré après dans le DOM) : sinon le bouton
+         bleu est visuellement visible mais les taps sont interceptés par
+         #viewer qui le recouvre — bug v1.0.0/v1.0.1 signalé par les testeurs */
+      z-index: 5;
     }
     #empty p { opacity: .7; text-align: center; padding: 0 24px; }
     #openbtn { font-size: 18px; padding: 14px 28px; border: none; border-radius: 12px; background: #2f6fed; color: #fff; cursor: pointer; }
+    #err {
+      display: none; margin: 0 24px; max-width: 420px; padding: 10px 14px;
+      border-radius: 10px; background: #fdecea; color: #8c1d18; font-size: 14px; text-align: center;
+    }
+    html.dark #err { background: #3a2422; color: #ffb4ad; }
     input[type=file] { display: none; }
   </style>
 </head>
@@ -47,80 +56,123 @@
   </div>
   <div id="empty">
     <button id="openbtn">Ouvrir un PDF</button>
+    <p id="err"></p>
     <p>Aucune publicité · Aucune collecte de données · 100 % hors ligne</p>
   </div>
   <div id="viewer"></div>
   <input type="file" id="file" accept="application/pdf,.pdf">
 
-  <script type="module">
-    import * as pdfjsLib from './pdfjs/pdf.min.mjs';
-    pdfjsLib.GlobalWorkerOptions.workerSrc = './pdfjs/pdf.worker.min.mjs';
+  <script>
+    // Script classique (pas un module) : les handlers s'attachent toujours,
+    // même si le chargement du moteur PDF (module ES) échoue. Le bouton reste
+    // donc réactif et affiche une erreur visible au lieu de rester muet.
+    (function () {
+      var viewer = document.getElementById('viewer');
+      var empty = document.getElementById('empty');
+      var fileInput = document.getElementById('file');
+      var pageinfo = document.getElementById('pageinfo');
+      var err = document.getElementById('err');
+      var pdfjs = null; // moteur PDF chargé à la demande (import dynamique)
+      var zooms = [0.5, 0.7, 1, 1.4, 2, 2.8, 4];
+      var zoomIdx = 2, pdf = null, pageCanvases = [];
 
-    const viewer = document.getElementById('viewer');
-    const empty = document.getElementById('empty');
-    const fileInput = document.getElementById('file');
-    const pageinfo = document.getElementById('pageinfo');
-    const zooms = [0.5, 0.7, 1, 1.4, 2, 2.8, 4];
-    let zoomIdx = 2, pdf = null, pageCanvases = [];
+      function showErr(msg) {
+        err.textContent = msg;
+        err.style.display = 'block';
+      }
+      function hideErr() {
+        err.style.display = 'none';
+      }
 
-    function fit() {
-      // zoom 1 = largeur écran
-      return Math.max(1, Math.floor((window.innerWidth - 24) / 612 * 10) / 10);
-    }
-    function baseScale() { return zooms[zoomIdx] * fit(); }
-
-    function render() {
-      if (!pdf) return;
-      viewer.innerHTML = ''; pageCanvases = [];
-      const scale = baseScale();
-      for (let n = 1; n <= pdf.numPages; n++) {
-        pdf.getPage(n).then(p => {
-          const vp = p.getViewport({ scale });
-          const c = document.createElement('canvas');
-          const ctx = c.getContext('2d');
-          c.width = Math.floor(vp.width);
-          c.height = Math.floor(vp.height);
-          c.dataset.page = n;
-          p.render({ canvasContext: ctx, viewport: vp });
-          viewer.appendChild(c);
-          pageCanvases.push(c);
-          if (n === pdf.numPages) pageinfo.textContent = '1 / ' + pdf.numPages;
+      // .js (et non .mjs) : garantie d'un MIME application/javascript quel que
+      // soit l'hôte (WebView Capacitor incluse), sinon le module ES est refusé
+      // et le bouton restait sans effet (bug v1.0.0/v1.0.1).
+      function ensurePdfjs() {
+        if (pdfjs) return Promise.resolve(pdfjs);
+        return import('./pdfjs/pdf.min.js').then(function (lib) {
+          lib.GlobalWorkerOptions.workerSrc = './pdfjs/pdf.worker.min.js';
+          pdfjs = lib;
+          return lib;
+        }).catch(function (e) {
+          throw new Error("moteur PDF non charg\u00e9 : " + (e && e.message ? e.message : e));
         });
       }
-    }
 
-    async function open(file) {
-      const buf = await file.arrayBuffer();
-      pdf = await pdfjsLib.getDocument({ data: buf }).promise;
-      empty.style.display = 'none';
-      zoomIdx = 2;
-      render();
-    }
+      function fit() {
+        // zoom 1 = largeur écran
+        return Math.max(1, Math.floor((window.innerWidth - 24) / 612 * 10) / 10);
+      }
+      function baseScale() { return zooms[zoomIdx] * fit(); }
 
-    viewer.addEventListener('scroll', () => {
-      if (!pdf) return;
-      const mid = viewer.scrollTop + viewer.clientHeight / 2;
-      for (const c of pageCanvases) {
-        if (mid >= c.offsetTop && mid < c.offsetTop + c.offsetHeight) {
-          pageinfo.textContent = c.dataset.page + ' / ' + pdf.numPages;
-          break;
+      function render() {
+        if (!pdf) return;
+        viewer.innerHTML = ''; pageCanvases = [];
+        var scale = baseScale();
+        for (var n = 1; n <= pdf.numPages; n++) {
+          pdf.getPage(n).then(function (p) {
+            var vp = p.getViewport({ scale: scale });
+            var c = document.createElement('canvas');
+            var ctx = c.getContext('2d');
+            c.width = Math.floor(vp.width);
+            c.height = Math.floor(vp.height);
+            c.dataset.page = p.pageNumber;
+            p.render({ canvasContext: ctx, viewport: vp });
+            viewer.appendChild(c);
+            pageCanvases.push(c);
+            if (p.pageNumber === pdf.numPages) pageinfo.textContent = '1 / ' + pdf.numPages;
+          });
         }
       }
-    }, { passive: true });
 
-    document.getElementById('zoomin').onclick = () => { if (pdf && zoomIdx < zooms.length - 1) { zoomIdx++; render(); } };
-    document.getElementById('zoomout').onclick = () => { if (pdf && zoomIdx > 0) { zoomIdx--; render(); } };
-    document.getElementById('theme').onclick = (e) => {
-      document.documentElement.classList.toggle('dark');
-      e.target.textContent = document.documentElement.classList.contains('dark') ? '☀️' : '🌙';
-      localStorage.setItem('theme', document.documentElement.classList.contains('dark') ? 'dark' : 'light');
-    };
-    if (localStorage.getItem('theme') === 'dark') {
-      document.documentElement.classList.add('dark');
-      document.getElementById('theme').textContent = '☀️';
-    }
-    fileInput.onchange = () => { if (fileInput.files[0]) open(fileInput.files[0]); };
-    document.getElementById('openbtn').onclick = () => fileInput.click();
+      function open(file) {
+        return ensurePdfjs().then(function (lib) {
+          return file.arrayBuffer();
+        }).then(function (buf) {
+          return pdfjs.getDocument({ data: buf }).promise;
+        }).then(function (doc) {
+          pdf = doc;
+          empty.style.display = 'none';
+          zoomIdx = 2;
+          render();
+        });
+      }
+
+      viewer.addEventListener('scroll', function () {
+        if (!pdf) return;
+        var mid = viewer.scrollTop + viewer.clientHeight / 2;
+        for (var i = 0; i < pageCanvases.length; i++) {
+          var c = pageCanvases[i];
+          if (mid >= c.offsetTop && mid < c.offsetTop + c.offsetHeight) {
+            pageinfo.textContent = c.dataset.page + ' / ' + pdf.numPages;
+            break;
+          }
+        }
+      }, { passive: true });
+
+      document.getElementById('zoomin').onclick = function () { if (pdf && zoomIdx < zooms.length - 1) { zoomIdx++; render(); } };
+      document.getElementById('zoomout').onclick = function () { if (pdf && zoomIdx > 0) { zoomIdx--; render(); } };
+      document.getElementById('theme').onclick = function (e) {
+        document.documentElement.classList.toggle('dark');
+        e.target.textContent = document.documentElement.classList.contains('dark') ? '☀️' : '🌙';
+        localStorage.setItem('theme', document.documentElement.classList.contains('dark') ? 'dark' : 'light');
+      };
+      if (localStorage.getItem('theme') === 'dark') {
+        document.documentElement.classList.add('dark');
+        document.getElementById('theme').textContent = '☀️';
+      }
+      fileInput.onchange = function () {
+        if (fileInput.files[0]) {
+          hideErr();
+          open(fileInput.files[0]).catch(function (e) {
+            showErr("Impossible d'ouvrir ce PDF : " + (e && e.message ? e.message : e));
+          });
+        }
+      };
+      document.getElementById('openbtn').onclick = function () {
+        hideErr();
+        fileInput.click();
+      };
+    })();
   </script>
 </body>
 </html>
