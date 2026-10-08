@@ -8,9 +8,9 @@
     "build": "cd android && ./gradlew bundleRelease assembleRelease"
   },
   "dependencies": {
-    "@capacitor/android": "^8.5.2",
-    "@capacitor/cli": "^8.5.2",
-    "@capacitor/core": "^8.5.2",
-    "pdfjs-dist": "^6.3.289"
+    "@capacitor/android": "^8.5.3",
+    "@capacitor/cli": "^8.5.3",
+    "@capacitor/core": "^8.5.3",
+    "pdfjs-dist": "^6.4.299"
   }
 }
