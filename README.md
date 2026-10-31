@@ -1,5 +1,10 @@
 # Lecteur PDF
 
+Offre :
+
+Preuve de capacité mobile : une app Android complète, publiée, 100 % hors ligne.
+
+
 Lecteur de PDF Android **simple, gratuit, sans publicité, 100 % hors ligne**.
 
 - 📄 Ouvre n'importe quel PDF depuis le téléphone
